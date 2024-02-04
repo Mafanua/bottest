@@ -93,6 +93,7 @@ async function getWeatherData(city) {
 
   //       }
   //   }
+  // тут надо дописать ловлю ошибки чтоб при написании непонтного города бота тупо не крашило и он дальше жил классной жизнью
     const response = await axios.get(
         `http://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${OPENWEATHERMAP_API_KEY}`
     )
@@ -113,6 +114,8 @@ async function getWeatherData(city) {
 //     }]
 //   })
 // }
+
+// тут надо дописать саму переделку в фото и тогда все будет круто классно
 
 bot.onText(/\/help/,(msg) => {bot.sendMessage(msg.chat.id, text.commands)})
 

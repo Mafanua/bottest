@@ -1,15 +1,14 @@
 require('dotenv').config()
 
+const Fs = require('fs')
 const TelegramBot = require('node-telegram-bot-api')
 const axios = require('axios')
-const plot = require('function-plot')
-const fs = require('node:fs')
 const TELEGRAM_BOT_TOKEN = process.env.BOT_TOKEN 
 const OPENWEATHERMAP_API_KEY = process.env.OPENWEATHERMAP_API_KEY
 
 const bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: true })
 const storage = {}
-const text =  require('./const')
+const text = require('./const')
 
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id
@@ -19,8 +18,8 @@ bot.onText(/\/start/, (msg) => {
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: 'Погода', callback_data: 'get_weather' }],
-            [{ text: 'Графики', callback_data: 'get_graf' }],
+            [{ text: 'Погода', callback_data: 'get_weather', show_loading: false }],
+            [{ text: 'Графики', callback_data: 'get_graf', show_loading: false }],
           ],
         },
       }
@@ -28,22 +27,22 @@ bot.onText(/\/start/, (msg) => {
   })
 
 bot.on('callback_query', async (callbackQuery) => {
-    const chatId = callbackQuery.message.chat.id
-    const data = callbackQuery.data
-  
-    switch (data) {
-      case 'get_weather':
-        const userDataWeather = getUserData(chatId)
-        userDataWeather.WaitingForWeather = true
-        bot.sendMessage(chatId, 'Напишите город в котором вы хотите узнать погоду')
-        break
-      case 'get_graf':
-        const userDataGraf = getUserData(chatId)
-        userDataGraf.WaitingForGraf = true
-        bot.sendMessage(chatId, 'Напишите ункцию график которой вам надо построить')
-      default:
-        break
-    }
+  const chatId = callbackQuery.message.chat.id
+  const data = callbackQuery.data
+
+  switch (data) {
+    case 'get_weather':
+      const userDataWeather = getUserData(chatId)
+      userDataWeather.WaitingForWeather = true
+      bot.sendMessage(chatId, 'Напишите город в котором вы хотите узнать погоду')
+      break
+    case 'get_graf':
+      const userDataGraf = getUserData(chatId)
+      userDataGraf.WaitingForGraf = true
+      bot.sendMessage(chatId, text.grafanotation)
+    default:
+      break
+  }
 })
  
 function getUserData(chatId) {
@@ -66,54 +65,61 @@ bot.on('message', async (msg) => {
     if (userData.WaitingForWeather) {
       const city = text
       let messageText = ''
-      messageText = await getWeatherData(city)
+      messageText = await getWeather(city)
       bot.sendMessage(chatId, messageText)
       resetUserData(chatId)
-    if (userData.WaitingForGraf){
-      const graf = text 
-      let massageIMG = ''
-      massageIMG = await getGraf(graf)
-      bot.sendPhoto(chatId, massageIMG)
-      resetUserData(chatId)
+    }else if (userData.WaitingForGraf){
+      const chart = text
+      try{
+        const data = []
+        for (let x = -10; x <= 10; x++) {
+          const y = eval(chart)
+          data.push(y)
+        }
+        data.join(',')
+        let massageIMG = ''
+        massageIMG = await gatChart(data)
+        bot.sendPhoto(chatId, massageIMG, { 
+          caption: 'График функции ' + chart,
+          contentType: 'image' 
+        })
+        resetUserData(chatId)
+      }catch(e){
+        bot.sendMessage(chatId, 'Вы вели неправилный график попробуйте еще раз')
+      }
     }
-}})
+})
 
 
-async function getWeatherData(city) {
-  // axios.get(`http://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${OPENWEATHERMAP_API_KEY}`)
-  // .catch(function (error) {
-  //   if (error.response) {
-  //     const errorWeather = error.response.status
-  //     console.log(errorWeather)
-  //     catchWeathererror(errorWeather)
-  //   }
-  //   })
-  //   function catchWeathererror(errorWeather){
-  //       if (errorWeather !=  ){
-
-  //       }
-  //   }
-  // тут надо дописать ловлю ошибки чтоб при написании непонтного города бота тупо не крашило и он дальше жил классной жизнью
-    const response = await axios.get(
+async function getWeather(city) {
+    try{
+      const response = await axios.get(
         `http://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${OPENWEATHERMAP_API_KEY}`
-    )
-    const temperature = Math.round(response.data.main.temp - 273.15)
-    const messageText = `Температура в городе ${city} сейчас состовляет ${temperature}°C.`
-    return messageText
+      )
+      const temperature = Math.round(response.data.main.temp - 273.15)
+      const messageText = `Температура в городе ${city} сейчас состовляет ${temperature}°C.`
+      return messageText
+    }catch(e){
+      const messageText = 'Вы неправильно ввели город попробуйте еще раз'
+      return messageText
+    }
 }
 
-// async function getGraf(garf){
-//   functionPlot({
-//     target: svg,  
-//     data: [{
-//       fn: garf,
-//       derivative: {
-//         fn: graf,
-//         updateOnMouseMove: true
-//       }
-//     }]
-//   })
-// }
+async function gatChart(chart) {
+  try {
+    const response = await axios.get(
+      `https://chart.googleapis.com/chart?cht=lc&chs=400x300&chd=t:${chart}`, 
+      { responseType: 'stream' }
+    )
+    const massageIMG = response.data
+    return massageIMG 
+
+  } catch (e) {
+    console.log('что-то не рабоатет');
+  }
+}
+
+
 
 // тут надо дописать саму переделку в фото и тогда все будет круто классно
 
